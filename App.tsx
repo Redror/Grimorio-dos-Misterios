@@ -13,62 +13,110 @@ import Rituals from './components/Rituals';
 import Talents from './components/Talents';
 import Personal from './components/Personal';
 import Campaign from './components/Campaign';
-import Social from './components/Social';
 import Profile from './components/Profile';
 import Guide from './components/Guide';
+import Pathways from './components/Pathways';
 
 const App: React.FC = () => {
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
-  const [character, setCharacter] = useState<Character>(INITIAL_CHARACTER);
-  const [activeTab, setActiveTab] = useState<'sheet' | 'campanha' | 'pessoal' | 'pericias' | 'origens' | 'itens' | 'talentos' | 'rituais' | 'mundo' | 'guia' | 'settings' | 'perfil'>('sheet');
+  const [userCharacters, setUserCharacters] = useState<Character[]>([]);
+  const [activeCharacterId, setActiveCharacterId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'sheet' | 'campanha' | 'pessoal' | 'pericias' | 'origens' | 'itens' | 'talentos' | 'rituais' | 'mundo' | 'guia' | 'caminhos' | 'settings' | 'perfil'>('sheet');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
+  // Load user session on start
   useEffect(() => {
-    // Check for session in localStorage
     const sessionUserStr = localStorage.getItem('lom-session-user');
     if (sessionUserStr) {
        try {
          const user = JSON.parse(sessionUserStr);
          setCurrentUserProfile(user);
        } catch (e) {
-         // Fallback for simple string sessions from previous version
-         const simpleName = localStorage.getItem('lom-session');
-         if (simpleName && !sessionUserStr) {
-           // Create a temp profile wrapper
-           setCurrentUserProfile({ username: simpleName, tag: '00000', friends: [] });
-         }
+         console.error("Session error", e);
        }
     }
   }, []);
 
+  // Load all characters for this user
   useEffect(() => {
     if (currentUserProfile) {
-      const saved = localStorage.getItem(`lom-character-data-${currentUserProfile.username}`);
-      if (saved) {
+      const storageKey = `lom-user-chars-${currentUserProfile.username}`;
+      const savedChars = localStorage.getItem(storageKey);
+      
+      if (savedChars) {
         try {
-          const parsed = JSON.parse(saved);
-          if (!parsed.traits) parsed.traits = [];
-          if (!parsed.skills) parsed.skills = {};
-          if (!parsed.talents) parsed.talents = [];
-          if (!parsed.skillLabels) parsed.skillLabels = {};
-          // Ensure personal object exists for older saves
-          if (!parsed.personal) parsed.personal = INITIAL_CHARACTER.personal;
-          setCharacter(parsed);
+          const parsed = JSON.parse(savedChars);
+          setUserCharacters(parsed.list || []);
+          setActiveCharacterId(parsed.activeId || (parsed.list?.[0]?.id || null));
         } catch (e) {
-          setCharacter(INITIAL_CHARACTER);
+          setUserCharacters([]);
         }
       } else {
-        setCharacter({...INITIAL_CHARACTER, name: currentUserProfile.username});
+        // Migration or New User: check for old single character data
+        const oldData = localStorage.getItem(`lom-character-data-${currentUserProfile.username}`);
+        if (oldData) {
+          try {
+            const char = JSON.parse(oldData);
+            if (!char.id) char.id = Date.now().toString();
+            setUserCharacters([char]);
+            setActiveCharacterId(char.id);
+          } catch (e) {
+             const firstChar = { ...INITIAL_CHARACTER, id: Date.now().toString(), name: "Novo Personagem" };
+             setUserCharacters([firstChar]);
+             setActiveCharacterId(firstChar.id);
+          }
+        } else {
+          const firstChar = { ...INITIAL_CHARACTER, id: Date.now().toString(), name: "Novo Personagem" };
+          setUserCharacters([firstChar]);
+          setActiveCharacterId(firstChar.id);
+        }
       }
     }
   }, [currentUserProfile]);
 
+  // Save characters to localStorage whenever they change
   useEffect(() => {
-    if (currentUserProfile) {
-      localStorage.setItem(`lom-character-data-${currentUserProfile.username}`, JSON.stringify(character));
+    if (currentUserProfile && userCharacters.length > 0) {
+      const storageKey = `lom-user-chars-${currentUserProfile.username}`;
+      localStorage.setItem(storageKey, JSON.stringify({
+        activeId: activeCharacterId,
+        list: userCharacters
+      }));
     }
-  }, [character, currentUserProfile]);
+  }, [userCharacters, activeCharacterId, currentUserProfile]);
+
+  const activeCharacter = userCharacters.find(c => c.id === activeCharacterId) || userCharacters[0];
+
+  const updateActiveCharacter = (updated: Character) => {
+    setUserCharacters(prev => prev.map(c => c.id === updated.id ? updated : c));
+  };
+
+  const handleCreateCharacter = () => {
+    const newChar = { 
+      ...INITIAL_CHARACTER, 
+      id: Date.now().toString(), 
+      name: `Personagem ${userCharacters.length + 1}` 
+    };
+    setUserCharacters(prev => [...prev, newChar]);
+    setActiveCharacterId(newChar.id);
+    setNotification("Novo registro Beyonder criado.");
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleDeleteCharacter = (id: string) => {
+    if (userCharacters.length <= 1) {
+      alert("Você deve manter pelo menos um registro ativo.");
+      return;
+    }
+    if (confirm("Excluir este personagem permanentemente?")) {
+      const newList = userCharacters.filter(c => c.id !== id);
+      setUserCharacters(newList);
+      if (activeCharacterId === id) {
+        setActiveCharacterId(newList[0].id);
+      }
+    }
+  };
 
   const handleLogin = (user: UserProfile) => {
     localStorage.setItem('lom-session-user', JSON.stringify(user));
@@ -77,9 +125,9 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('lom-session-user');
-    localStorage.removeItem('lom-session'); // clean old
     setCurrentUserProfile(null);
-    setCharacter(INITIAL_CHARACTER);
+    setUserCharacters([]);
+    setActiveCharacterId(null);
     setActiveTab('sheet');
   };
 
@@ -89,6 +137,7 @@ const App: React.FC = () => {
   };
 
   const handleAddItem = (itemName: string, stats: string) => {
+    if (!activeCharacter) return;
     const newItem: Item = {
       id: Date.now().toString(),
       name: itemName,
@@ -96,13 +145,13 @@ const App: React.FC = () => {
       isSealedArtifact: false
     };
 
-    const newNotes = character.notes 
-      ? `${character.notes}\n- ${itemName} (${stats})` 
+    const newNotes = activeCharacter.notes 
+      ? `${activeCharacter.notes}\n- ${itemName} (${stats})` 
       : `- ${itemName} (${stats})`;
 
-    setCharacter({
-      ...character,
-      inventory: [...(character.inventory || []), newItem],
+    updateActiveCharacter({
+      ...activeCharacter,
+      inventory: [...(activeCharacter.inventory || []), newItem],
       notes: newNotes
     });
 
@@ -111,7 +160,8 @@ const App: React.FC = () => {
   };
 
   const copyCharacterData = () => {
-    const data = JSON.stringify(character);
+    if (!activeCharacter) return;
+    const data = JSON.stringify(activeCharacter);
     navigator.clipboard.writeText(data);
     setNotification("Dados copiados! Envie para o Mestre da Campanha.");
     setTimeout(() => setNotification(null), 3000);
@@ -131,8 +181,9 @@ const App: React.FC = () => {
   );
 
   if (!currentUserProfile) return <AuthScreen onLogin={handleLogin} />;
+  if (!activeCharacter) return <div className="min-h-screen bg-mystic-900 flex items-center justify-center text-mystic-gold font-serif">Aguardando revelação do destino...</div>;
 
-  const isFullWidth = activeTab === 'perfil';
+  const isFullWidth = activeTab === 'perfil' || activeTab === 'caminhos';
 
   return (
     <div className="min-h-screen flex flex-col animate-fadeIn relative">
@@ -142,20 +193,22 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <nav className="bg-mystic-900 border-b border-mystic-gold/20 sticky top-0 z-50 shadow-2xl">
+      <nav className="bg-mystic-900 border-b border-mystic-gold/20 sticky top-0 z-50 shadow-2xl overflow-x-auto">
         <div className="w-full px-4 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
+          <div className="flex justify-between items-center h-16 min-w-max">
+            <div className="flex items-center gap-3 pr-4">
                <div className="w-8 h-8 rounded-full bg-mystic-gold/20 border border-mystic-gold flex items-center justify-center shrink-0">
                  <span className="text-mystic-gold font-serif font-bold">M</span>
                </div>
-               <span className="font-serif text-xl text-stone-200 tracking-wide hidden sm:block whitespace-nowrap">Grimório dos Mistérios</span>
+               <div className="flex flex-col">
+                  <span className="font-serif text-lg text-stone-200 tracking-wide hidden sm:block whitespace-nowrap leading-none">Grimório dos Mistérios</span>
+                  <span className="text-[10px] text-stone-500 font-mono hidden sm:block">CONTA: {currentUserProfile.username}</span>
+               </div>
             </div>
             
-            <div className="hidden lg:flex space-x-2 items-center">
+            <div className="hidden lg:flex space-x-1 items-center">
               <NavButton id="sheet" label="Grimório" />
-              <NavButton id="campanha" label="Campanha" />
-              <NavButton id="pessoal" label="Pessoal" />
+              <NavButton id="caminhos" label="Caminhos" />
               <NavButton id="pericias" label="Perícias" />
               <NavButton id="origens" label="Origens" />
               <NavButton id="itens" label="Itens" />
@@ -163,18 +216,14 @@ const App: React.FC = () => {
               <NavButton id="rituais" label="Rituais" />
               <NavButton id="mundo" label="Mundo" />
               <NavButton id="guia" label="Guia" />
-              <NavButton id="settings" label="Configurações" />
+              <NavButton id="campanha" label="Campanha" />
+              
               <div className="h-6 w-px bg-stone-700 mx-2"></div>
               
-              {/* User Profile / Perfil Button */}
               <button 
                 onClick={() => setActiveTab('perfil')}
                 className={`flex items-center gap-3 ml-2 hover:bg-white/5 p-1 rounded-lg transition-all group ${activeTab === 'perfil' ? 'bg-white/5 border border-mystic-gold/30' : 'border border-transparent'}`}
               >
-                <div className="flex flex-col items-end leading-none">
-                  <span className="text-xs text-stone-500 font-serif group-hover:text-stone-300">Olá, <span className="text-mystic-gold">{currentUserProfile.username}</span></span>
-                  <span className="text-[9px] text-stone-600 font-mono group-hover:text-stone-500">#{currentUserProfile.tag}</span>
-                </div>
                 <div className="w-8 h-8 rounded-full bg-stone-800 border border-stone-600 overflow-hidden flex items-center justify-center">
                    {currentUserProfile.avatar ? (
                      <img src={currentUserProfile.avatar} alt="Avatar" className="w-full h-full object-cover" />
@@ -197,8 +246,7 @@ const App: React.FC = () => {
           <div className="lg:hidden bg-mystic-800 border-b border-mystic-gold/20">
             <div className="flex flex-col p-2">
               <NavButton id="sheet" label="Grimório" />
-              <NavButton id="campanha" label="Campanha" />
-              <NavButton id="pessoal" label="Pessoal" />
+              <NavButton id="caminhos" label="Caminhos" />
               <NavButton id="pericias" label="Perícias" />
               <NavButton id="origens" label="Origens" />
               <NavButton id="itens" label="Itens" />
@@ -206,59 +254,59 @@ const App: React.FC = () => {
               <NavButton id="rituais" label="Rituais" />
               <NavButton id="mundo" label="Mundo" />
               <NavButton id="guia" label="Guia" />
-              <NavButton id="settings" label="Configurações" />
-              <div className="border-t border-stone-700 mt-2 pt-2">
-                 <NavButton id="perfil" label="Meu Perfil" />
-              </div>
+              <NavButton id="campanha" label="Campanha" />
+              <NavButton id="perfil" label="Meu Perfil" />
             </div>
           </div>
         )}
       </nav>
 
       <main className="flex-1 w-full p-4 lg:p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
           <div className={`${isFullWidth ? 'lg:col-span-12' : 'lg:col-span-8'} space-y-6`}>
-            {activeTab === 'sheet' && <CharacterSheet character={character} updateCharacter={setCharacter} />}
+            {activeTab === 'sheet' && (
+              <CharacterSheet 
+                character={activeCharacter} 
+                updateCharacter={updateActiveCharacter} 
+                allCharacters={userCharacters}
+                onSelectCharacter={setActiveCharacterId}
+                onCreateCharacter={handleCreateCharacter}
+                onDeleteCharacter={handleDeleteCharacter}
+              />
+            )}
+            {activeTab === 'caminhos' && <Pathways activeCharacter={activeCharacter} updateCharacter={updateActiveCharacter} />}
             {activeTab === 'campanha' && <Campaign currentUser={currentUserProfile} />}
             {activeTab === 'perfil' && <Profile currentUser={currentUserProfile} updateUser={updateSessionUser} onLogout={handleLogout} />}
-            {activeTab === 'pessoal' && <Personal character={character} updateCharacter={setCharacter} />}
-            {activeTab === 'pericias' && <Skills character={character} updateCharacter={setCharacter} />}
-            {activeTab === 'origens' && <Origins character={character} updateCharacter={setCharacter} />}
+            {activeTab === 'pessoal' && <Personal character={activeCharacter} updateCharacter={updateActiveCharacter} />}
+            {activeTab === 'pericias' && <Skills character={activeCharacter} updateCharacter={updateActiveCharacter} />}
+            {activeTab === 'origens' && <Origins character={activeCharacter} updateCharacter={updateActiveCharacter} />}
             {activeTab === 'itens' && <Items onAddItem={handleAddItem} />}
-            {activeTab === 'talentos' && <Talents character={character} updateCharacter={setCharacter} />}
+            {activeTab === 'talentos' && <Talents character={activeCharacter} updateCharacter={updateActiveCharacter} />}
             {activeTab === 'rituais' && <Rituals />}
             {activeTab === 'mundo' && <World />}
             {activeTab === 'guia' && <Guide />}
             {activeTab === 'settings' && (
               <div className="bg-mystic-800 p-6 rounded-lg border border-mystic-gold/20 space-y-6">
-                <div>
-                  <h2 className="text-xl font-serif text-mystic-gold mb-2">Configurações</h2>
-                  <p className="text-sm text-stone-500">Gerencie seus dados locais.</p>
-                </div>
-                
-                <div className="p-4 bg-mystic-900 rounded border border-stone-800">
-                  <h3 className="text-stone-300 font-bold mb-2">Entrar em Campanha</h3>
-                  <p className="text-xs text-stone-500 mb-4">Para entrar em uma campanha, copie seus dados e envie para o Mestre.</p>
-                  <button onClick={copyCharacterData} className="bg-mystic-gold text-mystic-900 font-bold px-4 py-2 rounded text-sm hover:bg-white transition-colors">
-                    Copiar Dados do Personagem (JSON)
-                  </button>
-                </div>
-
-                <div className="pt-4 border-t border-stone-700">
-                   <button onClick={() => confirm("Tem certeza? Isso apagará todos os dados.") && setCharacter({...INITIAL_CHARACTER, name: currentUserProfile.username || ''})} className="bg-red-900/50 hover:bg-red-900 border border-red-900 text-red-200 px-4 py-2 rounded text-xs">
-                     Resetar Personagem
-                   </button>
-                </div>
+                <h2 className="text-xl font-serif text-mystic-gold mb-2">Configurações</h2>
+                <button onClick={copyCharacterData} className="bg-mystic-gold text-mystic-900 font-bold px-4 py-2 rounded text-sm hover:bg-white transition-colors">
+                    Copiar Dados do Personagem Atual (JSON)
+                </button>
               </div>
             )}
           </div>
           {!isFullWidth && (
-            <div className="lg:col-span-4 space-y-6">
+            <div className="lg:col-span-4 space-y-6 h-fit sticky top-24">
               <DiceRoller />
-              <div className="bg-mystic-800 p-4 rounded-lg border border-stone-700">
+              <div className="bg-mystic-800 p-4 rounded-lg border border-stone-700 shadow-xl">
                 <div className="grid grid-cols-2 gap-4">
-                  <div><span className="block text-xs text-blue-400">Espiritualidade</span><span className="text-xl font-bold text-white">{character.stats.spirituality}</span></div>
-                  <div><span className="block text-xs text-red-400">Sanidade</span><span className="text-xl font-bold text-white">{character.stats.sanity}</span></div>
+                  <div className="text-center">
+                    <span className="block text-[10px] text-blue-400 uppercase tracking-widest mb-1">Espiritualidade</span>
+                    <span className="text-2xl font-bold text-white leading-none">{activeCharacter.stats.spirituality}</span>
+                  </div>
+                  <div className="text-center border-l border-stone-700">
+                    <span className="block text-[10px] text-red-400 uppercase tracking-widest mb-1">Sanidade</span>
+                    <span className="text-2xl font-bold text-white leading-none">{activeCharacter.stats.sanity}</span>
+                  </div>
                 </div>
               </div>
             </div>

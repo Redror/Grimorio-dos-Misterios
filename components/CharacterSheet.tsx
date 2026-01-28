@@ -6,11 +6,23 @@ import { PATHWAY_LIST, PATHWAY_QUOTES } from '../constants';
 interface CharacterSheetProps {
   character: Character;
   updateCharacter: (c: Character) => void;
+  allCharacters: Character[];
+  onSelectCharacter: (id: string) => void;
+  onCreateCharacter: () => void;
+  onDeleteCharacter: (id: string) => void;
 }
 
-const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, updateCharacter }) => {
+const CharacterSheet: React.FC<CharacterSheetProps> = ({ 
+  character, 
+  updateCharacter, 
+  allCharacters, 
+  onSelectCharacter, 
+  onCreateCharacter,
+  onDeleteCharacter 
+}) => {
   const [isEditingAttributes, setIsEditingAttributes] = useState(false);
   const [isEditingStats, setIsEditingStats] = useState(false);
+  const [showCharSelector, setShowCharSelector] = useState(false);
 
   const handleStatChange = (stat: keyof typeof character.stats, value: number) => {
     updateCharacter({
@@ -43,40 +55,21 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ character, updateCharac
   };
 
   const calculateDerivedStats = () => {
-    // Vigor corresponds to Spirit attribute in this system's mapping
     const vigor = character.attributes.spirit || 0;
-    // Espiritualidade corresponds to Mysticism attribute
     const esp = character.attributes.mysticism || 0;
-    
-    // Sequence ranges from 9 (Low) to 0 (High). 
-    // If undefined, default to 9.
     const seq = typeof character.sequence === 'number' ? character.sequence : 9;
-    
-    // --- HP Calculation ---
-    // Base Human: 10 + Vigor
-    // Per Advance: 3 + 2*Vigor
-    // Advances count: If Seq 9, 1 advance. If Seq 0, 10 advances.
     const advances = Math.max(0, 10 - seq);
     
     const baseHp = 10 + vigor;
     const growthHp = advances * (3 + (2 * vigor));
     const newMaxHp = baseHp + growthHp;
 
-    // --- EE (Spirituality) Calculation ---
-    // Same logic as HP but based on Esp (Mysticism)
     const baseEe = 10 + esp;
     const growthEe = advances * (3 + (2 * esp));
     const newMaxEe = baseEe + growthEe;
 
-    // --- Sanity Calculation ---
-    // Base Human: 50 + 10*Esp
-    // Reduction per potion: (Potion Level) - Esp. Min 0.
-    // Iterating from Potion 9 down to current Sequence Potion.
     const baseSanity = 50 + (10 * esp);
     let sanityReduction = 0;
-    
-    // If currently Seq 9, loop runs for k=9.
-    // If currently Seq 7, loop runs for k=9, k=8, k=7.
     for (let k = 9; k >= seq; k--) {
         const potionLevel = k;
         const cost = Math.max(0, potionLevel - esp);
@@ -107,7 +100,6 @@ Deseja aplicar estas alterações?`;
           maxHp: newMaxHp,
           maxSpirituality: newMaxEe,
           maxSanity: newMaxSanity,
-          // Ensure current values don't exceed new max
           hp: Math.min(character.stats.hp, newMaxHp),
           spirituality: Math.min(character.stats.spirituality, newMaxEe),
           sanity: Math.min(character.stats.sanity, newMaxSanity)
@@ -131,13 +123,81 @@ Deseja aplicar estas alterações?`;
   };
 
   const currentQuote = PATHWAY_QUOTES[character.pathway] || "";
-
-  // Helper for sanity/corruption color
   const isCorrupted = character.stats.sanity === 0;
   const isSanityLow = character.stats.sanity < (character.stats.maxSanity * 0.3);
 
   return (
     <div className="space-y-6">
+      {/* Character Selector Section */}
+      <div className="bg-mystic-900 border border-mystic-gold/20 rounded-lg overflow-hidden shadow-2xl">
+         <div 
+           onClick={() => setShowCharSelector(!showCharSelector)}
+           className="p-4 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors group"
+         >
+           <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-mystic-gold/10 border border-mystic-gold flex items-center justify-center text-mystic-gold font-serif font-bold text-xl">
+                 {character.name[0]}
+              </div>
+              <div>
+                 <span className="block text-[10px] text-stone-500 uppercase tracking-widest font-mono leading-none mb-1">Beyonder Ativo</span>
+                 <h2 className="text-xl font-serif text-white group-hover:text-mystic-gold transition-colors">{character.name}</h2>
+              </div>
+           </div>
+           <div className="flex items-center gap-4">
+              <div className="text-right hidden sm:block">
+                 <span className="block text-[9px] text-stone-600 uppercase font-mono">{character.pathway}</span>
+                 <span className="text-xs text-mystic-gold italic font-serif">Sequência {character.sequence}</span>
+              </div>
+              <svg 
+                className={`w-5 h-5 text-mystic-gold transition-transform duration-500 ${showCharSelector ? 'rotate-180' : ''}`} 
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+           </div>
+         </div>
+
+         {showCharSelector && (
+           <div className="p-4 border-t border-mystic-gold/10 bg-black/20 animate-fadeIn">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                 {allCharacters.map(char => (
+                   <div 
+                    key={char.id}
+                    className={`p-3 rounded border flex justify-between items-center transition-all ${
+                      char.id === character.id 
+                        ? 'bg-mystic-gold/10 border-mystic-gold shadow-[inset_0_0_10px_rgba(197,160,89,0.2)]' 
+                        : 'bg-mystic-800 border-stone-700 hover:border-mystic-gold/40 cursor-pointer'
+                    }`}
+                    onClick={() => onSelectCharacter(char.id)}
+                   >
+                     <div className="flex items-center gap-3 overflow-hidden">
+                        <div className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 font-serif font-bold ${char.id === character.id ? 'bg-mystic-gold text-mystic-900 border-mystic-gold' : 'bg-stone-900 text-stone-500 border-stone-700'}`}>
+                           {char.name[0]}
+                        </div>
+                        <div className="truncate">
+                           <span className={`block text-xs font-bold truncate ${char.id === character.id ? 'text-white' : 'text-stone-300'}`}>{char.name}</span>
+                           <span className="block text-[9px] text-stone-500 uppercase truncate">{char.pathway} (S{char.sequence})</span>
+                        </div>
+                     </div>
+                     <button 
+                       onClick={(e) => { e.stopPropagation(); onDeleteCharacter(char.id); }}
+                       className="text-stone-600 hover:text-red-500 p-1 transition-colors"
+                     >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                     </button>
+                   </div>
+                 ))}
+              </div>
+              <button 
+                onClick={onCreateCharacter}
+                className="w-full py-3 border-2 border-dashed border-stone-700 text-stone-500 hover:text-mystic-gold hover:border-mystic-gold transition-all rounded-lg uppercase tracking-widest text-xs font-bold font-serif"
+              >
+                + Iniciar Novo Registro Beyonder
+              </button>
+           </div>
+         )}
+      </div>
+
       {/* Header Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-mystic-800 p-6 rounded-lg border border-mystic-gold/30 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-mystic-gold to-transparent opacity-50"></div>
@@ -146,12 +206,13 @@ Deseja aplicar estas alterações?`;
         <div className="space-y-6">
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="block text-xs font-serif text-mystic-gold uppercase tracking-widest mb-1">Nome</label>
+              <label className="block text-xs font-serif text-mystic-gold uppercase tracking-widest mb-1">Nome do Personagem</label>
               <input 
                 type="text" 
                 value={character.name} 
                 onChange={(e) => updateCharacter({...character, name: e.target.value})}
                 className="w-full bg-transparent border-b border-stone-600 text-stone-100 text-xl font-serif focus:border-mystic-gold outline-none pb-1"
+                placeholder="Dê um nome ao seu Viajante..."
               />
             </div>
             <div className="w-1/3">
@@ -200,7 +261,6 @@ Deseja aplicar estas alterações?`;
            <div className="flex justify-between items-center mb-1">
              <span className="text-[10px] font-serif text-stone-500 uppercase tracking-tighter">Status Vitais</span>
              <div className="flex gap-2">
-               {/* Button always visible for easier access */}
                <button 
                  onClick={calculateDerivedStats}
                  className="text-[9px] px-2 py-0.5 rounded bg-mystic-gold/10 text-mystic-gold border border-mystic-gold/30 hover:bg-mystic-gold hover:text-mystic-900 transition-colors uppercase font-bold"
@@ -256,7 +316,6 @@ Deseja aplicar estas alterações?`;
                   <button onClick={() => handleStatChange('hp', Math.min(character.stats.maxHp, character.stats.hp + 5))} className="text-[10px] bg-stone-800 px-2 py-0.5 rounded hover:text-white hover:bg-green-900 transition-colors">+5</button>
                 </div>
               )}
-              {/* HP Warning Messages */}
               {character.stats.hp < (character.stats.maxHp * 0.2) && character.stats.hp > 0 && (
                 <p className="text-[9px] text-red-400 mt-1 font-serif italic text-center animate-pulse">Sua centelha de vida está se apagando...</p>
               )}
@@ -302,7 +361,6 @@ Deseja aplicar estas alterações?`;
                   <button onClick={() => handleStatChange('spirituality', Math.min(character.stats.maxSpirituality, character.stats.spirituality + 5))} className="text-[10px] bg-stone-800 px-2 py-0.5 rounded hover:text-white hover:bg-blue-900 transition-colors">+5</button>
                 </div>
               )}
-              {/* Spirituality Warning Messages */}
               {character.stats.spirituality < (character.stats.maxSpirituality * 0.2) && character.stats.spirituality > 0 && (
                 <p className="text-[9px] text-blue-400 mt-1 font-serif italic text-center animate-pulse">Sua conexão com o místico está instável...</p>
               )}
@@ -356,7 +414,6 @@ Deseja aplicar estas alterações?`;
                   <button onClick={() => handleStatChange('sanity', Math.min(character.stats.maxSanity, character.stats.sanity + 5))} className="text-[10px] bg-stone-800 px-2 py-0.5 rounded hover:text-white hover:bg-stone-700 transition-colors">+5</button>
                 </div>
               )}
-              {/* Sanity Warning Messages */}
               {isSanityLow && character.stats.sanity > 0 && (
                  <p className="text-[10px] text-mystic-corruption mt-1 font-serif italic text-center animate-pulse drop-shadow-[0_0_2px_rgba(124,58,237,0.3)]">
                    Os sussurros estão ficando mais altos...
@@ -418,7 +475,6 @@ Deseja aplicar estas alterações?`;
 
       {/* Lists Section: Habilidades, Traços, Inventário */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Habilidades */}
           <div className="bg-mystic-800 p-6 rounded-lg border border-mystic-gold/20 flex flex-col h-96">
             <h3 className="text-mystic-gold font-serif text-lg mb-4 flex justify-between items-center">
               <span>Habilidades</span>
@@ -478,7 +534,6 @@ Deseja aplicar estas alterações?`;
             </div>
           </div>
 
-          {/* Traços (Passivas) */}
           <div className="bg-mystic-800 p-6 rounded-lg border border-mystic-gold/20 flex flex-col h-96">
             <h3 className="text-mystic-gold font-serif text-lg mb-4 flex justify-between items-center">
               <span>Traços</span>
@@ -538,7 +593,6 @@ Deseja aplicar estas alterações?`;
             </div>
           </div>
 
-          {/* Inventário */}
           <div className="bg-mystic-800 p-6 rounded-lg border border-mystic-gold/20 flex flex-col h-96">
             <h3 className="text-mystic-gold font-serif text-lg mb-4">Inventário & Artefatos</h3>
             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">

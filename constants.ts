@@ -61,7 +61,8 @@ export const SKILLS_DEFINITION: Record<string, keyof Character['attributes']> = 
 };
 
 export const INITIAL_CHARACTER: Character = {
-  name: "Klein Moretti",
+  id: "initial-char-id",
+  name: "Novo Beyonder",
   pathway: Pathway.Fool,
   sequence: 9,
   attributeLabels: {
@@ -88,35 +89,14 @@ export const INITIAL_CHARACTER: Character = {
     sanity: 10,
     maxSanity: 10
   },
-  backstory: "Um Transmigrador que acordou no corpo de um graduado em história...",
-  abilities: [
-    {
-      id: '1',
-      name: 'Spirit Vision',
-      description: 'Veja as cores das auras para determinar a saúde e as emoções.',
-      cost: '2 Espiritualidade/min'
-    }
-  ],
-  traits: [
-    {
-      id: 't1',
-      name: 'Intuição de Divinação',
-      description: 'Sua percepção espiritual é aguçada, permitindo sentir perigo iminente ou mentiras triviais.',
-      cost: 'Passiva'
-    }
-  ],
+  backstory: "",
+  abilities: [],
+  traits: [],
   talents: [],
   skills: {},
-  inventory: [
-    {
-      id: '1',
-      name: 'Revólver',
-      description: 'Um revólver de ferro padrão.',
-      isSealedArtifact: false
-    }
-  ],
+  inventory: [],
   personal: {
-    about: "[Apague esta frase e descreva brevemente quem você é e sua vida até agora]",
+    about: "",
     age: "",
     originCountry: "",
     currentCountry: "",
@@ -148,7 +128,7 @@ export const INITIAL_CHARACTER: Character = {
       sealingMethod: ""
     }
   },
-  notes: "Cuidado com o monóculo."
+  notes: ""
 };
 
 export const SEQUENCE_NAMES: Record<string, string[]> = {

@@ -104,6 +104,7 @@ export interface PersonalInfo {
 }
 
 export interface Character {
+  id: string;
   name: string;
   pathway: Pathway | string;
   sequence: number; // 9 to 0
