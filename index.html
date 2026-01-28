@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grimório dos Mistérios</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              mystic: {
+                900: '#0f0e13',
+                800: '#1a1921',
+                700: '#26242f',
+                gold: '#c5a059',
+                crimson: '#8a1c1c',
+                fog: '#a8a29e',
+                corruption: '#7c3aed'
+              }
+            },
+            fontFamily: {
+              serif: ['Georgia', 'Cambria', '"Times New Roman"', 'Times', 'serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <script>
+      // Polyfill for process.env to prevent ReferenceError in browser
+      window.process = window.process || { env: { API_KEY: '' } };
+    </script>
+    <style>
+      body {
+        background-color: #0f0e13;
+        color: #a8a29e;
+      }
+      /* Custom scrollbar for webkit */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1a1921; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #3f3d4b; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #c5a059; 
+      }
+      
+      @keyframes glow-purple {
+        0%, 100% { box-shadow: 0 0 5px rgba(124, 58, 237, 0.4); }
+        50% { box-shadow: 0 0 15px rgba(124, 58, 237, 0.8); }
+      }
+      .animate-glow-purple {
+        animation: glow-purple 2s infinite ease-in-out;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
